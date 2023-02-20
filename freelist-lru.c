@@ -40,6 +40,9 @@ typedef struct
 
 	int			firstFreeBuffer;	/* Head of list of unused buffers */
 	int			lastFreeBuffer; /* Tail of list of unused buffers */
+	/*cs3223*/
+	LRUNode *LRUHead; // the first LRU Node in the LRU Stack
+	LRUNode *LRUTail; // the last LRU Node in the LRU Stack
 
 	/*
 	 * NOTE: lastFreeBuffer is undefined when firstFreeBuffer is -1 (that is,
@@ -99,6 +102,16 @@ typedef struct BufferAccessStrategyData
 
 /* cs3223 */
 void StrategyUpdateAccessedBuffer(int buf_id, bool delete);
+
+/*Data type definition for LRU Node in the doubly linked list of LRU Stack*/
+typedef struct LRUNode
+{
+	int buf_id;
+	LRUNode *prev_node; // pointer of the previous buffer node in the LRU Stack
+	LRUNode *next_node; // pointer of the next buffer node in the LRU Stack
+	/* *prev_node and *next_node is null for head/tail node */
+} LRUNode;
+
 
 /* Prototypes for internal functions */
 static BufferDesc *GetBufferFromRing(BufferAccessStrategy strategy,
