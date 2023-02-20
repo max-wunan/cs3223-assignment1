@@ -44,6 +44,8 @@ typedef struct
 	LRUNode *LRUHead; // the first LRU Node in the LRU Stack
 	LRUNode *LRUTail; // the last LRU Node in the LRU Stack
 
+	LRUNode LRUStack[FLEXIBLE_ARRAY_MEMBER]; // An array of all the LRU Nodes
+
 	/*
 	 * NOTE: lastFreeBuffer is undefined when firstFreeBuffer is -1 (that is,
 	 * when the list is empty)
@@ -521,7 +523,7 @@ StrategyInitialize(bool init)
 	 */
 	StrategyControl = (BufferStrategyControl *)
 		ShmemInitStruct("Buffer Strategy Status",
-						sizeof(BufferStrategyControl),
+						offsetof(BufferStrategyControl, LRUStack) + NBuffers * sizeof(LRUNode),
 						&found);
 
 	if (!found)
@@ -539,6 +541,19 @@ StrategyInitialize(bool init)
 		 */
 		StrategyControl->firstFreeBuffer = 0;
 		StrategyControl->lastFreeBuffer = NBuffers - 1;
+
+		/*cs3223*/
+		/* initialize the LRU Stack */
+		StrategyControl->LRUHead->prev_node = NULL;
+		StrategyControl->LRUHead->next_node = NULL;
+		StrategyControl->LRUTail->next_node = NULL;
+		StrategyControl->LRUTail->prev_node = NULL;
+
+		for (i = 0; i < NBuffers; i++) {
+			StrategyControl->LRUStack[i].prev_node = NULL;
+			StrategyControl->LRUStack[i].next_node = NULL;
+		}
+
 
 		/* Initialize the clock sweep pointer */
 		pg_atomic_init_u32(&StrategyControl->nextVictimBuffer, 0);
