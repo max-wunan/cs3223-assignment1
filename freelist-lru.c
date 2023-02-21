@@ -211,7 +211,56 @@ have_free_buffer(void)
 void
 StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 {
-	elog(ERROR, "StrategyUpdateAccessedBuffer: Not implemented!");
+	// elog(ERROR, "StrategyUpdateAccessedBuffer: Not implemented!");
+
+	// make sure buf_id given is valid
+	if (buf_id < 0 || buf_id > NBuffers) {
+		elog(ERROR, "StrategyUpdateAccessedBuffer: buf_id given is invalid!");
+		return;
+	}
+
+	LRUNode *current;
+
+	// To locate the current buffer in the LRU Stack
+	// Initialize current to the the top node
+	current = StrategyControl->LRUHead;
+
+	if (current != NULL) {
+		while (current != NULL) {
+			if (current->buf_id == buf_id) {
+				// remove the current node from its original position
+				if (current->prev_node != NULL) {
+					// make the next_node of the previous node points to the next node of current node
+					current->prev_node->next_node = current->next_node;
+				}
+				if (current->next_node != NULL) {
+					// make the prev_node of the next node points to the prev node of current node
+					current->next_node->prev_node = current->prev_node;
+				}
+				break;
+			} else {
+				current = current->next_node;
+			}
+		}
+
+		if (delete) {
+			// C4; current node alr removed, can just return
+			return;
+		} else {
+			if (current != NULL) {
+				// C1, if current alr in the buffer pool, move to the top
+				current->next_node = StrategyControl->LRUHead;
+				StrategyControl->LRUHead->prev_node = current;
+				current->prev_node = NULL;
+			}
+			
+		}
+	} else { 
+
+	}
+
+
+
 }
 
 
@@ -549,7 +598,7 @@ StrategyInitialize(bool init)
 		StrategyControl->LRUTail->next_node = NULL;
 		StrategyControl->LRUTail->prev_node = NULL;
 
-		for (i = 0; i < NBuffers; i++) {
+		for (int i = 0; i < NBuffers; i++) {
 			StrategyControl->LRUStack[i].prev_node = NULL;
 			StrategyControl->LRUStack[i].next_node = NULL;
 		}
