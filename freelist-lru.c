@@ -208,6 +208,7 @@ have_free_buffer(void)
 // Called by bufmgr when a buffer page is accessed.
 // Adjusts the position of buffer (identified by buf_id) in the LRU stack if delete is false;
 // otherwise, delete buffer buf_id from the LRU stack.
+
 void
 StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 {
@@ -243,23 +244,25 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 	}
 
 	if (delete) {
-		// C4; current node alr removed, can just return
+		// C4: current node alr removed, can just return
 		return;
 	} else {
 		if (current != NULL) {
-			// C1 & C3, current alr in the buffer pool, move to the top
+			// C1: current alr in the buffer pool, move to the top
 			current->next_node = StrategyControl->LRUHead;
 			StrategyControl->LRUHead->prev_node = current;
 			current->prev_node = NULL;
 		} else {
-			/* Current not in the stack & free list is non-empty
-			    Move to the top of LRU Stack (C2) */
+			/* Current not in the stack */
+			// C2 free list is non-empty, move from free list to LRU Stack top
+			// C3 free list is empty, select victim buffer to LRU Stack top
 			current = StrategyControl->LRUStack[buf_id]
 			if (StrategyControl->LRUTail == NULL || StrategyControl->LRUHead == NULL) { 
 				// if LRU Stack is empty
 				StrategyControl->LRUHead = current;
 				StrategyControl->LRUTail = current;
 			} else {
+				// move to top
 				current->next_node = StrategyControl->LRUHead;
 				current->prev_node = NULL;
 				StrategyControl->LRUHead->prev_node = current;
@@ -554,6 +557,9 @@ StrategyShmemSize(void)
 
 	/* size of the shared replacement strategy control block */
 	size = add_size(size, MAXALIGN(sizeof(BufferStrategyControl)));
+
+	// size of the LRUNode
+	size = add_size(size, MAXALIGN(sizeof(LRUNode) * NBuffers));
 
 	return size;
 }
