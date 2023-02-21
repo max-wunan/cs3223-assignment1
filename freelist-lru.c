@@ -44,7 +44,7 @@ typedef struct
 	LRUNode *LRUHead; // the first LRU Node in the LRU Stack
 	LRUNode *LRUTail; // the last LRU Node in the LRU Stack
 
-	LRUNode LRUStack[FLEXIBLE_ARRAY_MEMBER]; // An array of all the LRU Nodes
+	LRUNode *LRUStack[FLEXIBLE_ARRAY_MEMBER]; // An array of all the LRU Nodes
 
 	/*
 	 * NOTE: lastFreeBuffer is undefined when firstFreeBuffer is -1 (that is,
@@ -225,45 +225,49 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 	// Initialize current to the the top node
 	current = StrategyControl->LRUHead;
 
-	if (current != NULL) {
-		while (current != NULL) {
-			if (current->buf_id == buf_id) {
-				// remove the current node from its original position
-				if (current->prev_node != NULL) {
-					// make the next_node of the previous node points to the next node of current node
-					current->prev_node->next_node = current->next_node;
-				}
-				if (current->next_node != NULL) {
-					// make the prev_node of the next node points to the prev node of current node
-					current->next_node->prev_node = current->prev_node;
-				}
-				break;
-			} else {
-				current = current->next_node;
+	while (current != NULL) {
+		if (current->buf_id == buf_id) {
+			// remove the current node from its original position
+			if (current->prev_node != NULL) {
+				// make the next_node of the previous node points to the next node of current node
+				current->prev_node->next_node = current->next_node;
 			}
-		}
-
-		if (delete) {
-			// C4; current node alr removed, can just return
-			return;
+			if (current->next_node != NULL) {
+				// make the prev_node of the next node points to the prev node of current node
+				current->next_node->prev_node = current->prev_node;
+			}
+			break;
 		} else {
-			if (current != NULL) {
-				// C1, if current alr in the buffer pool, move to the top
-				current->next_node = StrategyControl->LRUHead;
-				StrategyControl->LRUHead->prev_node = current;
-				current->prev_node = NULL;
-			} else {
-				/* When there is no node in the LRU stack with buf_id = buf_id, 
-				the accessed node is not in the stack (C2&C3) */
-				
-
-			}
-			
+			current = current->next_node;
 		}
-	} else { 
-
 	}
 
+	if (delete) {
+		// C4; current node alr removed, can just return
+		return;
+	} else {
+		if (current != NULL) {
+			// C1 & C3, current alr in the buffer pool, move to the top
+			current->next_node = StrategyControl->LRUHead;
+			StrategyControl->LRUHead->prev_node = current;
+			current->prev_node = NULL;
+		} else {
+			/* Current not in the stack & free list is non-empty
+			    Move to the top of LRU Stack (C2) */
+			current = StrategyControl->LRUStack[buf_id]
+			if (StrategyControl->LRUTail == NULL || StrategyControl->LRUHead == NULL) { 
+				// if LRU Stack is empty
+				StrategyControl->LRUHead = current;
+				StrategyControl->LRUTail = current;
+			} else {
+				current->next_node = StrategyControl->LRUHead;
+				current->prev_node = NULL;
+				StrategyControl->LRUHead->prev_node = current;
+			}
+				
+		}
+			
+		}
 
 
 }
@@ -384,11 +388,15 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *buf_state)
 			 * of 8.3, but we'd better check anyway.)
 			 */
 			local_buf_state = LockBufHdr(buf);
-			if (BUF_STATE_GET_REFCOUNT(local_buf_state) == 0
-				&& BUF_STATE_GET_USAGECOUNT(local_buf_state) == 0)
+			if (BUF_STATE_GET_REFCOUNT(local_buf_state) == 0)
+				// usage count is not necessary in LRU Policy
+				// && BUF_STATE_GET_USAGECOUNT(local_buf_state) == 0)
 			{
 				if (strategy != NULL)
 					AddBufferToRing(strategy, buf);
+				/*cs3223*/
+				/* Call StrategUpdateAccessedBuffer for Case 2 */
+				StrategyUpdateAccessedBuffer(buf->buf_id, false);
 				*buf_state = local_buf_state;
 				return buf;
 			}
@@ -396,11 +404,14 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *buf_state)
 		}
 	}
 
-	/* Nothing on the freelist, so run the "clock sweep" algorithm */
-	trycounter = NBuffers;
-	for (;;)
+
+	/*cs3223*/
+	/* Nothing on the freelist, so run the LRU Policy algorithm (C3) */
+	//trycounter = NBuffers;
+	LRUNode *victimBuffer = StrategyControl->LRUTail;
+	while (victimBuffer != NULL)
 	{
-		buf = GetBufferDescriptor(ClockSweepTick());
+		buf = GetBufferDescriptor(victimBuffer->buf_id);
 
 		/*
 		 * If the buffer is pinned or has a nonzero usage_count, we cannot use
@@ -410,35 +421,34 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *buf_state)
 
 		if (BUF_STATE_GET_REFCOUNT(local_buf_state) == 0)
 		{
-			if (BUF_STATE_GET_USAGECOUNT(local_buf_state) != 0)
+			/* Found a usable buffer for LRU Policy */
+				if (strategy != NULL)
+					AddBufferToRing(strategy, buf);
+				/* Call StrategUpdateAccessedBuffer for Case 3 */
+				StrategyUpdateAccessedBuffer(buf->buf_id, false);
+				*buf_state = local_buf_state;
+				return buf;
+
+			/* if (BUF_STATE_GET_USAGECOUNT(local_buf_state) != 0)
 			{
 				local_buf_state -= BUF_USAGECOUNT_ONE;
 
-				trycounter = NBuffers;
+				//trycounter = NBuffers;
 			}
 			else
 			{
-				/* Found a usable buffer */
 				if (strategy != NULL)
 					AddBufferToRing(strategy, buf);
 				*buf_state = local_buf_state;
 				return buf;
-			}
+			} */
 		}
-		else if (--trycounter == 0)
-		{
-			/*
-			 * We've scanned all the buffers without making any state changes,
-			 * so all the buffers are pinned (or were when we looked at them).
-			 * We could hope that someone will free one eventually, but it's
-			 * probably better to fail than to risk getting stuck in an
-			 * infinite loop.
-			 */
-			UnlockBufHdr(buf, local_buf_state);
-			elog(ERROR, "no unpinned buffers available");
-		}
+	
 		UnlockBufHdr(buf, local_buf_state);
+		victimBuffer = victimBuffer->prev_node;
 	}
+
+	elog(ERROR, "no unpinned buffers available");
 }
 
 /*
