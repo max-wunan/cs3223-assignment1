@@ -252,6 +252,11 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 				current->next_node = StrategyControl->LRUHead;
 				StrategyControl->LRUHead->prev_node = current;
 				current->prev_node = NULL;
+			} else {
+				/* When there is no node in the LRU stack with buf_id = buf_id, 
+				the accessed node is not in the stack (C2&C3) */
+				
+
 			}
 			
 		}
