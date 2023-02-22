@@ -229,7 +229,7 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 
 	// To locate the current buffer in the LRU Stack
 	// Initialize current to the the top node
-	current = StrategyControl->LRUStack[StrategyControl->LRUHead];
+	current = StrategyControl->LRUStack[StrategyControl->LRUHead->buf_id];
 
 	while (current != NULL) {
 		if (current->buf_id == buf_id) {
@@ -257,7 +257,7 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 			// (C1) def
 			// current alr in the buffer pool, move to the top
 			current->next_node = StrategyControl->LRUHead;
-			StrategyControl->LRUHead.prev_node = current;
+			StrategyControl->LRUHead->prev_node = current;
 			current->prev_node = NULL;
 		} else {
 			/* Current not in the stack */
