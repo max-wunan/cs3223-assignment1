@@ -23,6 +23,15 @@
 #define INT_ACCESS_ONCE(var)	((int)(*((volatile int *)&(var))))
 
 
+/*Data type definition for LRU Node in the doubly linked list of LRU Stack*/
+typedef struct LRUNode
+{
+	int buf_id;
+	LRUNode *prev_node; // pointer of the previous buffer node in the LRU Stack
+	LRUNode *next_node; // pointer of the next buffer node in the LRU Stack
+	/* *prev_node and *next_node is null for head/tail node */
+} LRUNode;
+
 /*
  * The shared freelist control information.
  */
@@ -44,7 +53,7 @@ typedef struct
 	LRUNode *LRUHead; // the first LRU Node in the LRU Stack
 	LRUNode *LRUTail; // the last LRU Node in the LRU Stack
 
-	LRUNode *LRUStack[FLEXIBLE_ARRAY_MEMBER]; // An array of all the LRU Nodes
+	
 
 	/*
 	 * NOTE: lastFreeBuffer is undefined when firstFreeBuffer is -1 (that is,
@@ -63,6 +72,8 @@ typedef struct
 	 * StrategyNotifyBgWriter.
 	 */
 	int			bgwprocno;
+
+	LRUNode *LRUStack[FLEXIBLE_ARRAY_MEMBER]; // An array of all the LRU Nodes
 } BufferStrategyControl;
 
 /* Pointers to shared state */
@@ -105,14 +116,7 @@ typedef struct BufferAccessStrategyData
 /* cs3223 */
 void StrategyUpdateAccessedBuffer(int buf_id, bool delete);
 
-/*Data type definition for LRU Node in the doubly linked list of LRU Stack*/
-typedef struct LRUNode
-{
-	int buf_id;
-	LRUNode *prev_node; // pointer of the previous buffer node in the LRU Stack
-	LRUNode *next_node; // pointer of the next buffer node in the LRU Stack
-	/* *prev_node and *next_node is null for head/tail node */
-} LRUNode;
+
 
 
 /* Prototypes for internal functions */
@@ -231,11 +235,11 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 			// remove the current node from its original position
 			if (current->prev_node != NULL) {
 				// make the next_node of the previous node points to the next node of current node
-				current->prev_node->next_node = current->next_node;
+				current->prev_node.next_node = current->next_node;
 			}
 			if (current->next_node != NULL) {
 				// make the prev_node of the next node points to the prev node of current node
-				current->next_node->prev_node = current->prev_node;
+				current->next_node.prev_node = current->prev_node;
 			}
 			break;
 		} else {
@@ -252,13 +256,13 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 			// (C1) def
 			// current alr in the buffer pool, move to the top
 			current->next_node = StrategyControl->LRUHead;
-			StrategyControl->LRUHead->prev_node = current;
+			StrategyControl->LRUHead.prev_node = current;
 			current->prev_node = NULL;
 		} else {
 			/* Current not in the stack */
 			// (C3) def
 			// free list is empty, select victim buffer to LRU Stack top
-			current = StrategyControl->LRUStack[buf_id]
+			current = StrategyControl->LRUStack[buf_id];
 			if (StrategyControl->LRUTail == NULL || StrategyControl->LRUHead == NULL) { 
 				// if LRU Stack is empty
 				StrategyControl->LRUHead = current;
@@ -480,7 +484,7 @@ StrategyFreeBuffer(BufferDesc *buf)
 
 		// (C4) implementation
 		// buffer returned to free list, remove from LRU stack
-		StrategyUpdateAccessedBuffer(buf->buf_id, true)
+		StrategyUpdateAccessedBuffer(buf->buf_id, true);
 	}
 
 
@@ -625,10 +629,10 @@ StrategyInitialize(bool init)
 
 		/*cs3223*/
 		/* initialize the LRU Stack */
-		StrategyControl->LRUHead->prev_node = NULL;
-		StrategyControl->LRUHead->next_node = NULL;
-		StrategyControl->LRUTail->next_node = NULL;
-		StrategyControl->LRUTail->prev_node = NULL;
+		StrategyControl->LRUHead.prev_node = NULL;
+		StrategyControl->LRUHead.next_node = NULL;
+		StrategyControl->LRUTail.next_node = NULL;
+		StrategyControl->LRUTail.prev_node = NULL;
 
 		for (int i = 0; i < NBuffers; i++) {
 			StrategyControl->LRUStack[i].prev_node = NULL;
