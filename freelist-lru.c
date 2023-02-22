@@ -22,6 +22,7 @@
 
 #define INT_ACCESS_ONCE(var)	((int)(*((volatile int *)&(var))))
 
+typedef struct LRUNode LRUNode;
 
 /*Data type definition for LRU Node in the doubly linked list of LRU Stack*/
 typedef struct LRUNode
@@ -228,18 +229,18 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 
 	// To locate the current buffer in the LRU Stack
 	// Initialize current to the the top node
-	current = StrategyControl->LRUHead;
+	current = StrategyControl->LRUStack[StrategyControl->LRUHead];
 
 	while (current != NULL) {
 		if (current->buf_id == buf_id) {
 			// remove the current node from its original position
 			if (current->prev_node != NULL) {
 				// make the next_node of the previous node points to the next node of current node
-				current->prev_node.next_node = current->next_node;
+				current->prev_node->next_node = current->next_node;
 			}
 			if (current->next_node != NULL) {
 				// make the prev_node of the next node points to the prev node of current node
-				current->next_node.prev_node = current->prev_node;
+				current->next_node->prev_node = current->prev_node;
 			}
 			break;
 		} else {
@@ -629,10 +630,10 @@ StrategyInitialize(bool init)
 
 		/*cs3223*/
 		/* initialize the LRU Stack */
-		StrategyControl->LRUHead.prev_node = NULL;
-		StrategyControl->LRUHead.next_node = NULL;
-		StrategyControl->LRUTail.next_node = NULL;
-		StrategyControl->LRUTail.prev_node = NULL;
+		StrategyControl->LRUHead->prev_node = NULL;
+		StrategyControl->LRUHead->next_node = NULL;
+		StrategyControl->LRUTail->next_node = NULL;
+		StrategyControl->LRUTail->prev_node = NULL;
 
 		for (int i = 0; i < NBuffers; i++) {
 			StrategyControl->LRUStack[i].prev_node = NULL;
