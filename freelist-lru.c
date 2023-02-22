@@ -244,17 +244,20 @@ StrategyUpdateAccessedBuffer(int buf_id, bool delete)
 	}
 
 	if (delete) {
-		// (C4): current node alr removed, can just return
+		// (C4) def
+		//current node alr removed, can just return
 		return;
 	} else {
 		if (current != NULL) {
-			// (C1): current alr in the buffer pool, move to the top
+			// (C1) def
+			// current alr in the buffer pool, move to the top
 			current->next_node = StrategyControl->LRUHead;
 			StrategyControl->LRUHead->prev_node = current;
 			current->prev_node = NULL;
 		} else {
 			/* Current not in the stack */
-			// (C3) free list is empty, select victim buffer to LRU Stack top
+			// (C3) def
+			// free list is empty, select victim buffer to LRU Stack top
 			current = StrategyControl->LRUStack[buf_id]
 			if (StrategyControl->LRUTail == NULL || StrategyControl->LRUHead == NULL) { 
 				// if LRU Stack is empty
@@ -397,7 +400,8 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *buf_state)
 				if (strategy != NULL)
 					AddBufferToRing(strategy, buf);
 				/*cs3223*/
-				/* Call StrategUpdateAccessedBuffer for (C2) */
+				/* Call StrategUpdateAccessedBuffer for */
+				// (C2) def & (C2) implementation
 				StrategyUpdateAccessedBuffer(buf->buf_id, false);
 				*buf_state = local_buf_state;
 				return buf;
@@ -426,7 +430,9 @@ StrategyGetBuffer(BufferAccessStrategy strategy, uint32 *buf_state)
 			/* Found a usable buffer for LRU Policy */
 				if (strategy != NULL)
 					AddBufferToRing(strategy, buf);
-				/* Call StrategUpdateAccessedBuffer for (C3) */
+				/* Call StrategUpdateAccessedBuffer for */
+				// (C3) implementation
+				// ? (C1) implementation
 				StrategyUpdateAccessedBuffer(buf->buf_id, false);
 				*buf_state = local_buf_state;
 				return buf;
@@ -471,7 +477,13 @@ StrategyFreeBuffer(BufferDesc *buf)
 		if (buf->freeNext < 0)
 			StrategyControl->lastFreeBuffer = buf->buf_id;
 		StrategyControl->firstFreeBuffer = buf->buf_id;
+
+		// (C4) implementation
+		// buffer returned to free list, remove from LRU stack
+		StrategyUpdateAccessedBuffer(buf->buf_id, true)
 	}
+
+
 
 	SpinLockRelease(&StrategyControl->buffer_strategy_lock);
 }
