@@ -636,8 +636,8 @@ StrategyInitialize(bool init)
 		StrategyControl->LRUTail->prev_node = NULL;
 
 		for (int i = 0; i < NBuffers; i++) {
-			StrategyControl->LRUStack[i].prev_node = NULL;
-			StrategyControl->LRUStack[i].next_node = NULL;
+			StrategyControl->LRUStack[i]->prev_node = NULL;
+			StrategyControl->LRUStack[i]->next_node = NULL;
 		}
 
 
